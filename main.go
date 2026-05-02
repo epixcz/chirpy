@@ -17,14 +17,25 @@ func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
 	})
 }
 
+// Updated Handler to return HTML
 func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf("Hits: %d", cfg.fileserverHits.Load())))
+
+	html := `
+<html>
+  <body>
+    <h1>Welcome, Chirpy Admin</h1>
+    <p>Chirpy has been visited %d times!</p>
+  </body>
+</html>
+`
+	fmt.Fprintf(w, html, cfg.fileserverHits.Load())
 }
 
 func (cfg *apiConfig) handlerReset(w http.ResponseWriter, r *http.Request) {
 	cfg.fileserverHits.Store(0)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Hits reset to 0"))
 }
@@ -33,24 +44,20 @@ func main() {
 	apiCfg := &apiConfig{}
 	mux := http.NewServeMux()
 
-	// 1. Static Fileserver (stays on /app/)
+	// 1. Fileserver (tracks hits via middleware)
 	fsHandler := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
 	mux.Handle("/app/", apiCfg.middlewareMetricsInc(fsHandler))
 
-	// 2. Prepended /api to all logic endpoints
-
-	// GET /api/healthz
+	// 2. API Namespace
 	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
 
-	// GET /api/metrics
-	mux.HandleFunc("GET /api/metrics", apiCfg.handlerMetrics)
-
-	// POST /api/reset
-	mux.HandleFunc("POST /api/reset", apiCfg.handlerReset)
+	// 3. Admin Namespace (Updated paths and methods)
+	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
+	mux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
 
 	server := &http.Server{
 		Addr:    ":8080",
@@ -58,7 +65,5 @@ func main() {
 	}
 
 	fmt.Println("Server running on http://localhost:8080")
-	fmt.Println("API Base: http://localhost:8080/api")
-
 	server.ListenAndServe()
 }
