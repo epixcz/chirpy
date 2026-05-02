@@ -33,24 +33,24 @@ func main() {
 	apiCfg := &apiConfig{}
 	mux := http.NewServeMux()
 
-	// Use the "METHOD PATH" syntax for automatic 405 handling
+	// 1. Static Fileserver (stays on /app/)
+	fsHandler := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
+	mux.Handle("/app/", apiCfg.middlewareMetricsInc(fsHandler))
 
-	// 1. Update /healthz to only accept GET
-	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+	// 2. Prepended /api to all logic endpoints
+
+	// GET /api/healthz
+	mux.HandleFunc("GET /api/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("OK"))
 	})
 
-	// 2. Update /metrics to only accept GET
-	mux.HandleFunc("GET /metrics", apiCfg.handlerMetrics)
+	// GET /api/metrics
+	mux.HandleFunc("GET /api/metrics", apiCfg.handlerMetrics)
 
-	// 3. Update /reset to only accept POST
-	mux.HandleFunc("POST /reset", apiCfg.handlerReset)
-
-	// File server remains on /app/ (usually handles GET/HEAD automatically)
-	fsHandler := http.StripPrefix("/app", http.FileServer(http.Dir(".")))
-	mux.Handle("/app/", apiCfg.middlewareMetricsInc(fsHandler))
+	// POST /api/reset
+	mux.HandleFunc("POST /api/reset", apiCfg.handlerReset)
 
 	server := &http.Server{
 		Addr:    ":8080",
@@ -58,5 +58,7 @@ func main() {
 	}
 
 	fmt.Println("Server running on http://localhost:8080")
+	fmt.Println("API Base: http://localhost:8080/api")
+
 	server.ListenAndServe()
 }
