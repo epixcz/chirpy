@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync/atomic"
 )
 
@@ -20,8 +21,8 @@ type errorResponse struct {
 	Error string `json:"error"`
 }
 
-type validResponse struct {
-	Valid bool `json:"valid"`
+type cleanedResponse struct {
+	CleanedBody string `json:"cleaned_body"`
 }
 
 func main() {
@@ -68,12 +69,29 @@ func (cfg *apiConfig) handlerChirpValidate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, validResponse{
-		Valid: true,
+	respondWithJSON(w, http.StatusOK, cleanedResponse{
+		CleanedBody: cleanChirp(params.Body),
 	})
 }
 
 // --- Helpers ---
+
+func cleanChirp(body string) string {
+	profaneWords := map[string]struct{}{
+		"kerfuffle": {},
+		"sharbert":  {},
+		"fornax":    {},
+	}
+
+	words := strings.Split(body, " ")
+	for i, word := range words {
+		if _, ok := profaneWords[strings.ToLower(word)]; ok {
+			words[i] = "****"
+		}
+	}
+
+	return strings.Join(words, " ")
+}
 
 func respondWithError(w http.ResponseWriter, code int, msg string) {
 	respondWithJSON(w, code, errorResponse{
