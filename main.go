@@ -83,6 +83,7 @@ func main() {
 
 	mux.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
 	mux.HandleFunc("POST /api/chirps", apiCfg.handlerCreateChirp)
+	mux.HandleFunc("GET /api/chirps", apiCfg.handlerGetChirps)
 
 	server := &http.Server{
 		Addr:    ":8080",
@@ -138,6 +139,21 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 	}
 
 	respondWithJSON(w, http.StatusCreated, databaseUserToUser(user))
+}
+
+func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
+	chirps, err := cfg.db.GetChirps(r.Context())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps")
+		return
+	}
+
+	response := make([]Chirp, 0, len(chirps))
+	for _, chirp := range chirps {
+		response = append(response, databaseChirpToChirp(chirp))
+	}
+
+	respondWithJSON(w, http.StatusOK, response)
 }
 
 // --- Helpers ---
