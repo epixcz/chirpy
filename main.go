@@ -1,15 +1,23 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 	"strings"
 	"sync/atomic"
+
+	"github.com/epixcz/chirpy/internal/database"
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
+	db             *database.Queries
 }
 
 // Structs for JSON decoding and encoding
@@ -26,7 +34,20 @@ type cleanedResponse struct {
 }
 
 func main() {
-	apiCfg := &apiConfig{}
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
+	dbURL := os.Getenv("DB_URL")
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	dbQueries := database.New(db)
+	apiCfg := &apiConfig{
+		db: dbQueries,
+	}
 	mux := http.NewServeMux()
 
 	// Existing routes
