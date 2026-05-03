@@ -25,7 +25,8 @@ type apiConfig struct {
 
 // Structs for JSON decoding and encoding
 type chirpRequest struct {
-	Body string `json:"body"`
+	Body   string    `json:"body"`
+	UserID uuid.UUID `json:"user_id"`
 }
 
 type userRequest struct {
@@ -39,12 +40,16 @@ type User struct {
 	Email     string    `json:"email"`
 }
 
-type errorResponse struct {
-	Error string `json:"error"`
+type Chirp struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Body      string    `json:"body"`
+	UserID    uuid.UUID `json:"user_id"`
 }
 
-type cleanedResponse struct {
-	CleanedBody string `json:"cleaned_body"`
+type errorResponse struct {
+	Error string `json:"error"`
 }
 
 func main() {
@@ -76,9 +81,8 @@ func main() {
 	mux.HandleFunc("GET /admin/metrics", apiCfg.handlerMetrics)
 	mux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
 
-	// New Validation Endpoint
-	mux.HandleFunc("POST /api/validate_chirp", apiCfg.handlerChirpValidate)
 	mux.HandleFunc("POST /api/users", apiCfg.handlerCreateUser)
+	mux.HandleFunc("POST /api/chirps", apiCfg.handlerCreateChirp)
 
 	server := &http.Server{
 		Addr:    ":8080",
@@ -91,7 +95,7 @@ func main() {
 
 // --- Handlers ---
 
-func (cfg *apiConfig) handlerChirpValidate(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	params := chirpRequest{}
 	err := decoder.Decode(&params)
@@ -106,9 +110,16 @@ func (cfg *apiConfig) handlerChirpValidate(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, cleanedResponse{
-		CleanedBody: cleanChirp(params.Body),
+	chirp, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{
+		Body:   cleanChirp(params.Body),
+		UserID: params.UserID,
 	})
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create chirp")
+		return
+	}
+
+	respondWithJSON(w, http.StatusCreated, databaseChirpToChirp(chirp))
 }
 
 func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) {
@@ -137,6 +148,16 @@ func databaseUserToUser(user database.User) User {
 		CreatedAt: user.CreatedAt,
 		UpdatedAt: user.UpdatedAt,
 		Email:     user.Email,
+	}
+}
+
+func databaseChirpToChirp(chirp database.Chirp) Chirp {
+	return Chirp{
+		ID:        chirp.ID,
+		CreatedAt: chirp.CreatedAt,
+		UpdatedAt: chirp.UpdatedAt,
+		Body:      chirp.Body,
+		UserID:    chirp.UserID,
 	}
 }
 
