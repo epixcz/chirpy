@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -352,11 +353,34 @@ func (cfg *apiConfig) handlerPolkaWebhooks(w http.ResponseWriter, r *http.Reques
 }
 
 func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
-	chirps, err := cfg.db.GetChirps(r.Context())
+	var chirps []database.Chirp
+	var err error
+
+	authorIDParam := r.URL.Query().Get("author_id")
+	if authorIDParam != "" {
+		authorID, err := uuid.Parse(authorIDParam)
+		if err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid author_id")
+			return
+		}
+
+		chirps, err = cfg.db.GetChirpsByAuthor(r.Context(), authorID)
+	} else {
+		chirps, err = cfg.db.GetChirps(r.Context())
+	}
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps")
 		return
 	}
+
+	sortOrder := r.URL.Query().Get("sort")
+	sort.Slice(chirps, func(i, j int) bool {
+		if sortOrder == "desc" {
+			return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+		}
+
+		return chirps[i].CreatedAt.Before(chirps[j].CreatedAt)
+	})
 
 	response := make([]Chirp, 0, len(chirps))
 	for _, chirp := range chirps {
