@@ -49,3 +49,48 @@ func TestGetBearerTokenRejectsMalformedAuthorizationHeader(t *testing.T) {
 		t.Fatal("GetBearerToken accepted malformed Authorization header")
 	}
 }
+
+func TestGetAPIKey(t *testing.T) {
+	headers := http.Header{}
+	headers.Set("Authorization", "ApiKey THE_KEY_HERE")
+
+	apiKey, err := GetAPIKey(headers)
+	if err != nil {
+		t.Fatalf("GetAPIKey returned error: %v", err)
+	}
+
+	if apiKey != "THE_KEY_HERE" {
+		t.Fatalf("got api key %q, want %q", apiKey, "THE_KEY_HERE")
+	}
+}
+
+func TestGetAPIKeyTrimsWhitespace(t *testing.T) {
+	headers := http.Header{}
+	headers.Set("Authorization", "ApiKey   THE_KEY_HERE  ")
+
+	apiKey, err := GetAPIKey(headers)
+	if err != nil {
+		t.Fatalf("GetAPIKey returned error: %v", err)
+	}
+
+	if apiKey != "THE_KEY_HERE" {
+		t.Fatalf("got api key %q, want %q", apiKey, "THE_KEY_HERE")
+	}
+}
+
+func TestGetAPIKeyMissingAuthorizationHeader(t *testing.T) {
+	_, err := GetAPIKey(http.Header{})
+	if err == nil {
+		t.Fatal("GetAPIKey accepted missing Authorization header")
+	}
+}
+
+func TestGetAPIKeyRejectsMalformedAuthorizationHeader(t *testing.T) {
+	headers := http.Header{}
+	headers.Set("Authorization", "Bearer THE_KEY_HERE")
+
+	_, err := GetAPIKey(headers)
+	if err == nil {
+		t.Fatal("GetAPIKey accepted malformed Authorization header")
+	}
+}
